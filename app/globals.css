@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #06090f;
+  --bg-secondary: #0d1117;
+  --bg-card: #161b22;
+  --bg-card-hover: #1c2333;
+  --border: #21262d;
+  --border-light: #30363d;
+  --text-primary: #f0f6fc;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #00d4aa;
+  --accent-glow: rgba(0, 212, 170, 0.15);
+  --accent-dark: #00b894;
+  --blue: #58a6ff;
+  --green: #00d4aa;
+  --green-dark: #00b894;
+  --red: #f85149;
+  --orange: #f0883e;
+  --yellow: #d29922;
+  --purple: #bc8cff;
+  --available: #00d4aa;
+  --booked: #f85149;
+  --hold: #f0883e;
+  --reserved: #bc8cff;
+  --agreement: #58a6ff;
+  --gradient-1: linear-gradient(135deg, #00d4aa 0%, #58a6ff 100%);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+.plot-marker polygon {
+  transition: fill-opacity 0.2s ease, stroke-width 0.2s ease;
+  cursor: pointer;
+}
+.plot-marker:hover polygon { fill-opacity: 0.6 !important; }
+.plot-marker.selected polygon {
+  stroke-width: 18;
+  stroke-opacity: 1;
+  filter: drop-shadow(0 0 12px currentColor);
+}
+.plot-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  pointer-events: none;
+  user-select: none;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+.glass {
+  background: rgba(22, 27, 34, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px rgba(0, 212, 170, 0.15), 0 0 60px rgba(0, 212, 170, 0.05);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+.animate-slide-up { animation: slideUp 0.6s ease-out forwards; }
+
+.status-badge {
+  @apply inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full;
+}
+
+.card-hover {
+  transition: all 0.3s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-light);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.btn-primary {
+  @apply px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200;
+  background: var(--gradient-1);
+  color: #000;
+}
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 212, 170, 0.3);
+}
+
+.btn-secondary {
+  @apply px-5 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-light);
+}
