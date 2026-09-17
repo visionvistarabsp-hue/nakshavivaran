@@ -21,12 +21,16 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
   const [search, setSearch] = useState("");
   const [showLabels, setShowLabels] = useState(false);
   const [mobileDetail, setMobileDetail] = useState<PlotRow | null>(null);
+  const [isInteracting, setIsInteracting] = useState(false);
 
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const viewStart = useRef({ tx: 0, ty: 0 });
   const pinchDist = useRef(0);
   const pinchScale = useRef(1);
+  const pinchMid = useRef({ x: 0, y: 0 });
+  const rafId = useRef<number>(0);
+  const smoothState = useRef({ scale: 1, tx: 0, ty: 0 });
 
   useEffect(() => {
     setShowLabels(scale >= 1.4);
@@ -42,6 +46,7 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     const s = Math.min(scaleX, scaleY) * 0.95;
     const newTx = (cw - IMAGE_WIDTH * s) / 2;
     const newTy = (ch - IMAGE_HEIGHT * s) / 2;
+    smoothState.current = { scale: s, tx: newTx, ty: newTy };
     setScale(s);
     setTx(newTx);
     setTy(newTy);
@@ -53,6 +58,41 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [fitToContainer]);
+
+  // Non-passive wheel listener for preventDefault
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+
+      const prev = smoothState.current;
+      const newScale = Math.max(0.3, Math.min(8, prev.scale * factor));
+      const k = newScale / prev.scale;
+      const newTx = px - (px - prev.tx) * k;
+      const newTy = py - (py - prev.ty) * k;
+      const clamped = clamp(newTx, newTy, newScale);
+
+      smoothState.current = { scale: newScale, tx: clamped.tx, ty: clamped.ty };
+
+      if (!rafId.current) {
+        rafId.current = requestAnimationFrame(() => {
+          setScale(smoothState.current.scale);
+          setTx(smoothState.current.tx);
+          setTy(smoothState.current.ty);
+          rafId.current = 0;
+        });
+      }
+    };
+
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
 
   const clamp = useCallback((newTx: number, newTy: number, s: number) => {
     const el = containerRef.current;
@@ -80,33 +120,14 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     return { tx: clampedTx, ty: clampedTy };
   }, []);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-
-    setScale((prev) => {
-      const newScale = Math.max(0.3, Math.min(8, prev * factor));
-      const k = newScale / prev;
-      const newTx = px - (px - tx) * k;
-      const newTy = py - (py - ty) * k;
-      const clamped = clamp(newTx, newTy, newScale);
-      setTx(clamped.tx);
-      setTy(clamped.ty);
-      return newScale;
-    });
-  }, [tx, ty, clamp]);
-
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     dragging.current = true;
+    setIsInteracting(true);
     dragStart.current = { x: e.clientX, y: e.clientY };
     viewStart.current = { tx, ty };
+    smoothState.current = { scale, tx, ty };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [tx, ty]);
+  }, [tx, ty, scale]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragging.current) return;
@@ -115,13 +136,16 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     const newTx = viewStart.current.tx + dx;
     const newTy = viewStart.current.ty + dy;
     const clamped = clamp(newTx, newTy, scale);
+    smoothState.current = { scale, tx: clamped.tx, ty: clamped.ty };
     setTx(clamped.tx);
     setTy(clamped.ty);
   }, [scale, clamp]);
 
   const handlePointerUp = useCallback(() => {
     dragging.current = false;
-  }, []);
+    smoothState.current = { scale, tx, ty };
+    setTimeout(() => setIsInteracting(false), 50);
+  }, [scale, tx, ty]);
 
   // Touch pinch zoom
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -130,10 +154,17 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       pinchDist.current = Math.sqrt(dx * dx + dy * dy);
       pinchScale.current = scale;
+      pinchMid.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+      setIsInteracting(true);
     } else if (e.touches.length === 1) {
       dragging.current = true;
+      setIsInteracting(true);
       dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       viewStart.current = { tx, ty };
+      smoothState.current = { scale, tx, ty };
     }
   }, [tx, ty, scale]);
 
@@ -149,13 +180,20 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
       if (!el) return;
       const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - el.getBoundingClientRect().left;
       const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - el.getBoundingClientRect().top;
-      const k = newScale / scale;
-      const newTx = cx - (cx - tx) * k;
-      const newTy = cy - (cy - ty) * k;
+      const k = newScale / smoothState.current.scale;
+      const newTx = cx - (cx - smoothState.current.tx) * k;
+      const newTy = cy - (cy - smoothState.current.ty) * k;
       const clamped = clamp(newTx, newTy, newScale);
-      setScale(newScale);
-      setTx(clamped.tx);
-      setTy(clamped.ty);
+      smoothState.current = { scale: newScale, tx: clamped.tx, ty: clamped.ty };
+
+      if (!rafId.current) {
+        rafId.current = requestAnimationFrame(() => {
+          setScale(smoothState.current.scale);
+          setTx(smoothState.current.tx);
+          setTy(smoothState.current.ty);
+          rafId.current = 0;
+        });
+      }
     } else if (e.touches.length === 1 && dragging.current) {
       const dx = e.touches[0].clientX - dragStart.current.x;
       const dy = e.touches[0].clientY - dragStart.current.y;
@@ -165,11 +203,13 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
       setTx(clamped.tx);
       setTy(clamped.ty);
     }
-  }, [scale, tx, ty, clamp]);
+  }, [scale, clamp]);
 
   const handleTouchEnd = useCallback(() => {
     dragging.current = false;
-  }, []);
+    smoothState.current = { scale, tx, ty };
+    setTimeout(() => setIsInteracting(false), 50);
+  }, [scale, tx, ty]);
 
   const handlePlotClick = useCallback((plot: PlotRow) => {
     setSelected(plot.label);
@@ -197,6 +237,7 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     setScale(target);
     setTx(clamped.tx);
     setTy(clamped.ty);
+    smoothState.current = { scale: target, tx: clamped.tx, ty: clamped.ty };
     setSelected(found.label);
     setMobileDetail(found);
     onSelect?.(found);
@@ -218,16 +259,20 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     const newTx = cx - (cx - tx) * k;
     const newTy = cy - (cy - ty) * k;
     const clamped = clamp(newTx, newTy, newScale);
+    smoothState.current = { scale: newScale, tx: clamped.tx, ty: clamped.ty };
     setScale(newScale);
     setTx(clamped.tx);
     setTy(clamped.ty);
   }, [scale, tx, ty, clamp]);
 
+  const smoothStyle = !isInteracting
+    ? { transition: "transform 0.18s cubic-bezier(0.25,0.1,0.25,1)" }
+    : {};
+
   return (
     <div className="w-full h-full flex flex-col bg-[var(--bg-primary)]">
-      {/* Toolbar - mobile optimized */}
+      {/* Toolbar */}
       <div className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)] shrink-0">
-        {/* Search */}
         <div className="relative flex-1 min-w-0">
           <svg className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
@@ -248,7 +293,6 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
 
         <div className="w-px h-5 bg-[var(--border)] shrink-0" />
 
-        {/* Zoom */}
         <div className="flex items-center gap-0.5 shrink-0">
           <button onClick={() => zoomCentered(1.4)}
             className="w-7 h-7 flex items-center justify-center rounded-lg bg-[var(--bg-card)] border border-[var(--border)] active:bg-[var(--bg-card-hover)] transition-all text-sm font-bold">
@@ -274,14 +318,13 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
       <div
         ref={containerRef}
         className="relative flex-1 overflow-hidden bg-[var(--bg-primary)] min-h-0"
-        onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ touchAction: "none", cursor: "grab" }}
+        style={{ touchAction: "none", cursor: dragging.current ? "grabbing" : "grab" }}
       >
         <div
           style={{
@@ -290,6 +333,8 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
             width: IMAGE_WIDTH,
             height: IMAGE_HEIGHT,
             position: "relative",
+            willChange: "transform",
+            ...smoothStyle,
           }}
         >
           <img
@@ -380,7 +425,7 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
           </svg>
         </div>
 
-        {/* Tooltip - desktop only */}
+        {/* Tooltip - desktop */}
         {tooltip && !mobileDetail && (
           <div
             className="hidden sm:block absolute z-10 pointer-events-none glass rounded-lg px-3 py-2 text-xs max-w-[200px] animate-fade-in"
@@ -397,12 +442,11 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
           </div>
         )}
 
-        {/* Mobile detail panel - full width bottom sheet */}
+        {/* Mobile detail panel */}
         {mobileDetail && (
           <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20 animate-slide-up">
             <div className="mx-2 mb-2 rounded-2xl overflow-hidden"
               style={{ background: "rgba(13,17,23,0.95)", backdropFilter: "blur(20px)", border: "1px solid var(--border)" }}>
-              {/* Header */}
               <div className="flex items-center justify-between px-4 pt-3 pb-2">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-sm"
@@ -429,7 +473,6 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
                 </button>
               </div>
 
-              {/* Details grid */}
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-2 gap-2">
                   {mobileDetail.khasara && (
