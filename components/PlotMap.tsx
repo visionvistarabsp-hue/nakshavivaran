@@ -486,12 +486,14 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
             }}
           >
             <picture>
-              <source media="(max-width: 1023px)" type="image/avif" srcSet="/JALI_3600.avif" />
-              <source media="(max-width: 1023px)" type="image/webp" srcSet="/JALI_3600.webp" />
-              <source type="image/avif" srcSet="/JALI_7200.avif" />
-              <source type="image/webp" srcSet="/JALI_7200.webp" />
+              <source media="(max-width: 1023px)" type="image/avif" srcSet="/JALI_2400.avif" />
+              <source media="(max-width: 1023px)" type="image/webp" srcSet="/JALI_2400.webp" />
+              <source media="(max-width: 1023px)" type="image/jpeg" srcSet="/JALI_2400.jpg" />
+              <source type="image/avif" srcSet="/JALI_3600.avif" />
+              <source type="image/webp" srcSet="/JALI_3600.webp" />
+              <source type="image/jpeg" srcSet="/JALI_3600.jpg" />
               <img
-                src="/JALI_page_1.png"
+                src="/JALI_3600.jpg"
                 alt="JALI Layout Plan"
                 width={IMAGE_WIDTH}
                 height={IMAGE_HEIGHT}
