@@ -3,7 +3,7 @@
   "name": "JALI Layout",
   "tagline": "Serviced plot layout",
   "description": "A well-planned plot layout captured from the original land plan. Plots are numbered 6 to 162 and can be explored on the interactive map.",
-  "source_image": "JALI_page_1.png",
+  "source_image": "assets/plan.webp",
   "image": "assets/plan.webp",
   "thumbnail": "assets/plan-thumb.webp",
   "image_size": [
