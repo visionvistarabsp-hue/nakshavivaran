@@ -485,14 +485,22 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
               ...smoothStyle,
             }}
           >
-            <img
-              src="/JALI_page_1.png"
-              alt="JALI Layout Plan"
-              width={IMAGE_WIDTH}
-              height={IMAGE_HEIGHT}
-              className="absolute inset-0 select-none pointer-events-none"
-              draggable={false}
-            />
+            <picture>
+              <source media="(max-width: 1023px)" type="image/avif" srcSet="/JALI_3600.avif" />
+              <source media="(max-width: 1023px)" type="image/webp" srcSet="/JALI_3600.webp" />
+              <source type="image/avif" srcSet="/JALI_7200.avif" />
+              <source type="image/webp" srcSet="/JALI_7200.webp" />
+              <img
+                src="/JALI_page_1.png"
+                alt="JALI Layout Plan"
+                width={IMAGE_WIDTH}
+                height={IMAGE_HEIGHT}
+                className="absolute inset-0 select-none pointer-events-none"
+                draggable={false}
+                loading="eager"
+                fetchPriority="high"
+              />
+            </picture>
 
             <svg
               width={IMAGE_WIDTH}
