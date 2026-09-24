@@ -64,8 +64,8 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
   }, [plots]);
 
   useEffect(() => {
-    setShowLabels(scale >= 1.4);
-  }, [scale]);
+    if (!isInteracting) setShowLabels(scale >= 1.4);
+  }, [scale, isInteracting]);
 
   const writeView = useCallback(() => {
     const el = viewRef.current;
@@ -481,7 +481,6 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
               width: IMAGE_WIDTH,
               height: IMAGE_HEIGHT,
               position: "relative",
-              willChange: "transform",
               ...smoothStyle,
             }}
           >
