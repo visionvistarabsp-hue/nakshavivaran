@@ -93,7 +93,7 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
 
   const getScaleBounds = useCallback(() => {
     const fit = fitScaleRef.current;
-    return { min: fit * 0.6, max: 8 };
+    return { min: fit * 0.6, max: 4 };
   }, []);
 
   const clampTransform = useCallback((newTx: number, newTy: number, s: number) => {
