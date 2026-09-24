@@ -22,7 +22,7 @@ export default async function HomePage() {
   }));
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-dvh flex flex-col overflow-hidden">
       <Header />
       <MapWithSidebar plots={plotList} />
       <Footer />
