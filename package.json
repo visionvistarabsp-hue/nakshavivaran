@@ -2,6 +2,9 @@
   "name": "naksha-vivaran",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <21"
+  },
   "scripts": {
     "dev": "rimraf .next && next dev",
     "build": "rimraf .next && next build",
