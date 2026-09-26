@@ -26,9 +26,18 @@ interface Props {
   mapDef: MapDef;
   initialSelected?: string | null;
   onSelect?: (plot: PlotRow) => void;
+  // Set false by the unlisted share view so the detail sheet offers no route back
+  // into the admin editor. Defaults to true to keep the public map unchanged.
+  showMapSwitcher?: boolean;
 }
 
-export default function PlotMap({ plots, mapDef, initialSelected, onSelect }: Props) {
+export default function PlotMap({
+  plots,
+  mapDef,
+  initialSelected,
+  onSelect,
+  showMapSwitcher = true,
+}: Props) {
   // Each map has its own coordinate space (JALI 7200x4000, Map 2 1615x904), so
   // the canvas size comes from the map row and every visual weight is expressed
   // relative to JALI's 7200 to stay optically identical across maps.
@@ -803,9 +812,11 @@ export default function PlotMap({ plots, mapDef, initialSelected, onSelect }: Pr
                     <div className="text-[var(--text-muted)] text-xs text-center py-2">No details added yet</div>
                   )}
 
-                  <a href="/admin" className="block mt-3 text-center text-xs font-semibold py-2.5 rounded-xl btn-primary">
-                    Edit Details in Admin →
-                  </a>
+                  {showMapSwitcher && (
+                    <a href="/admin" className="block mt-3 text-center text-xs font-semibold py-2.5 rounded-xl btn-primary">
+                      Edit Details in Admin →
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

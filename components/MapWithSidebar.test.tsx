@@ -9,9 +9,23 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 // PlotMap draws onto a <canvas>, which jsdom cannot provide. It is replaced by a
 // button that hands a plot back, so selection-driven sidebar chrome can be tested.
+// The stub also mirrors the real component's "Edit Details in Admin" link, which
+// only renders in the detail sheet and honours the same flag — that link is the
+// reason the flag has to reach PlotMap and not just MapWithSidebar.
 vi.mock("./PlotMap", () => ({
-  default: ({ plots, onSelect }: { plots: unknown[]; onSelect: (p: unknown) => void }) => (
-    <button onClick={() => onSelect(plots[0])}>stub-plot</button>
+  default: ({
+    plots,
+    onSelect,
+    showMapSwitcher,
+  }: {
+    plots: unknown[];
+    onSelect: (p: unknown) => void;
+    showMapSwitcher?: boolean;
+  }) => (
+    <>
+      <button onClick={() => onSelect(plots[0])}>stub-plot</button>
+      {showMapSwitcher && <a href="/admin">Edit Details in Admin →</a>}
+    </>
   ),
 }));
 
@@ -47,6 +61,15 @@ describe("MapWithSidebar", () => {
 
       expect(screen.getByRole("link", { name: /Edit in Admin/ })).toBeInTheDocument();
     });
+
+    it("passes the flag down so the map's own detail sheet keeps its admin link", () => {
+      const { container } = render(
+        <MapWithSidebar plots={[makePlot()]} maps={[jali, map2]} activeMap={jali} />
+      );
+      selectFirstPlot(container);
+
+      expect(screen.getByRole("link", { name: /Edit Details in Admin/ })).toBeInTheDocument();
+    });
   });
 
   describe("showMapSwitcher={false}", () => {
@@ -72,6 +95,20 @@ describe("MapWithSidebar", () => {
 
       expect(screen.getByText("Plot Details")).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /Edit in Admin/ })).not.toBeInTheDocument();
+    });
+
+    it("renders no link at all once a plot is selected, including the map's own", () => {
+      const { container } = render(
+        <MapWithSidebar
+          showMapSwitcher={false}
+          plots={[makePlot()]}
+          maps={[jali, map2]}
+          activeMap={jali}
+        />
+      );
+      selectFirstPlot(container);
+
+      expect(screen.queryAllByRole("link")).toHaveLength(0);
     });
 
     it("never navigates, even if a switcher button were somehow rendered", () => {

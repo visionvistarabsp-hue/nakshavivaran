@@ -46,7 +46,12 @@ export default function MapWithSidebar({
       {/* Left: Map */}
       <section id="map" className="flex-1 min-w-0 flex flex-col border-r border-[var(--border)]">
         {activeMap ? (
-          <PlotMap plots={plots} mapDef={activeMap} onSelect={setSelectedPlot} />
+          <PlotMap
+            plots={plots}
+            mapDef={activeMap}
+            onSelect={setSelectedPlot}
+            showMapSwitcher={showMapSwitcher}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">
             No map configured yet.
