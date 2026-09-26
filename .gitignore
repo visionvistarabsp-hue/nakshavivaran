@@ -42,3 +42,7 @@ zoom_*.png
 
 # local backups of generated data
 *.bak
+
+# browser-automation session artifacts (accessibility snapshots, console logs,
+# traces) written by the local verification tooling
+.playwright-mcp/

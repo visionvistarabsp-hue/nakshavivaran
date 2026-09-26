@@ -98,6 +98,10 @@ export default function AdminPanel({
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaved = useRef<string>("");
+  // The debounced edit that has not reached the server yet. Switching maps
+  // remounts this panel, so the cleanup below flushes it instead of dropping the
+  // user's last keystroke.
+  const pendingSave = useRef<{ data: typeof formData; plot: PlotRow } | null>(null);
   const router = useRouter();
 
   const filtered = plots.filter((p) => {
@@ -142,6 +146,7 @@ export default function AdminPanel({
     const serialized = JSON.stringify(data);
     if (serialized === lastSaved.current) return;
 
+    pendingSave.current = null;
     setSaveStatus("saving");
     try {
       const res = await fetch(`/api/plots/${plot.id}`, {
@@ -169,7 +174,9 @@ export default function AdminPanel({
       const next = { ...prev, ...patch };
       if (selected) {
         if (saveTimer.current) clearTimeout(saveTimer.current);
+        pendingSave.current = { data: next, plot: selected };
         saveTimer.current = setTimeout(() => {
+          saveTimer.current = null;
           saveToServer(next, selected);
         }, 500);
       }
@@ -179,9 +186,19 @@ export default function AdminPanel({
 
   useEffect(() => {
     return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+      }
+      // Remounting on a map switch unmounts this panel; fire the last debounced
+      // edit now rather than letting the timer be cancelled with it.
+      const pending = pendingSave.current;
+      if (pending) {
+        pendingSave.current = null;
+        void saveToServer(pending.data, pending.plot);
+      }
     };
-  }, []);
+  }, [saveToServer]);
 
   const stats = {
     total: plots.length,

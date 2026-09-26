@@ -55,6 +55,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
       <Header activeMapSlug={activeMap?.slug} />
       <main className="flex-1 min-h-0 overflow-hidden">
         <AdminPanel
+          // Remount on a map switch: the panel keeps plots, the selected row and
+          // the edit form in local state, and React preserves that state across a
+          // client-side navigation to the same route. Without this key the list
+          // and the counters stayed pinned to whichever map loaded first.
+          key={activeMap?.id ?? "no-map"}
           plots={plotList}
           maps={maps}
           activeMap={activeMap}
