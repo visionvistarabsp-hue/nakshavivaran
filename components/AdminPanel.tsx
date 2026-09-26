@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import ShareLinkButton from "./ShareLinkButton";
 import {
   MapDef,
   PlotRow,
@@ -272,27 +273,29 @@ export default function AdminPanel({
             {maps.map((m) => {
               const active = m.id === activeMap?.id;
               return (
-                <button
-                  key={m.id}
-                  onClick={() => router.push(m.is_default ? "/admin" : `/admin?map=${m.slug}`)}
-                  aria-current={active ? "page" : undefined}
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all"
-                  style={
-                    active
-                      ? {
-                          background: "var(--accent-glow)",
-                          color: "var(--accent)",
-                          borderColor: "rgba(0,212,170,0.35)",
-                        }
-                      : {
-                          background: "var(--bg-card)",
-                          color: "var(--text-muted)",
-                          borderColor: "var(--border)",
-                        }
-                  }
-                >
-                  {m.name}
-                </button>
+                <div key={m.id} className="flex items-center gap-1">
+                  <button
+                    onClick={() => router.push(m.is_default ? "/admin" : `/admin?map=${m.slug}`)}
+                    aria-current={active ? "page" : undefined}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all"
+                    style={
+                      active
+                        ? {
+                            background: "var(--accent-glow)",
+                            color: "var(--accent)",
+                            borderColor: "rgba(0,212,170,0.35)",
+                          }
+                        : {
+                            background: "var(--bg-card)",
+                            color: "var(--text-muted)",
+                            borderColor: "var(--border)",
+                          }
+                    }
+                  >
+                    {m.name}
+                  </button>
+                  <ShareLinkButton slug={m.slug} mapName={m.name} />
+                </div>
               );
             })}
             {activeMap && (
