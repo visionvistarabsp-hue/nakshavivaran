@@ -24,9 +24,12 @@ export async function middleware(request: NextRequest) {
   );
 
   try {
+    // Not an auth check - it exists to refresh the session cookie so downstream
+    // `getUser()` calls see a fresh token. Authorization lives in lib/admin.ts
+    // and in the RLS policies.
     await supabase.auth.getUser();
   } catch {
-    // Auth not configured yet, ignore
+    // No valid session. Nothing to do; the request continues unauthenticated.
   }
 
   return supabaseResponse;

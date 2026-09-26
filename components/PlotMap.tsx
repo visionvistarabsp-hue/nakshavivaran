@@ -1,24 +1,45 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { PlotRow, STATUS_COLORS, STATUS_LABELS } from "@/lib/types";
-import { IMAGE_WIDTH, IMAGE_HEIGHT, calcFontSize, polygonToPoints } from "@/lib/plots";
+import {
+  MapDef,
+  PlotRow,
+  STATUS_COLORS,
+  STATUS_LABELS,
+  displayPlotNumber,
+  formatDimension,
+  hasStatementMetadata,
+} from "@/lib/types";
+import { IMAGE_WIDTH, calcFontSize, polygonToPoints } from "@/lib/plots";
 
 const DRAG_THRESHOLD = 6;
 const TAP_MAX_DIST = 40;
 const TAP_MAX_TIME = 300;
+// Labels only appear once the user is zoomed well past the fitted view. Expressed
+// as a multiple of the fit scale (not an absolute scale) so that a map with a
+// smaller coordinate space than JALI's 7200x4000 doesn't reveal labels at a
+// visually shallower zoom. 12.6 reproduces the previous JALI behaviour.
+const LABEL_ZOOM_FACTOR = 12.6;
 
 interface Props {
   plots: PlotRow[];
+  mapDef: MapDef;
   initialSelected?: string | null;
   onSelect?: (plot: PlotRow) => void;
 }
 
-export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
+export default function PlotMap({ plots, mapDef, initialSelected, onSelect }: Props) {
+  // Each map has its own coordinate space (JALI 7200x4000, Map 2 1615x904), so
+  // the canvas size comes from the map row and every visual weight is expressed
+  // relative to JALI's 7200 to stay optically identical across maps.
+  const W = mapDef.width;
+  const H = mapDef.height;
+  const vs = W / IMAGE_WIDTH;
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const pctRef = useRef<HTMLSpanElement>(null);
   const [scale, setScale] = useState(1);
+  const [fitScale, setFitScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
   const [selected, setSelected] = useState<string | null>(initialSelected || null);
@@ -64,8 +85,8 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
   }, [plots]);
 
   useEffect(() => {
-    if (!isInteracting) setShowLabels(scale >= 1.4);
-  }, [scale, isInteracting]);
+    if (!isInteracting) setShowLabels(scale >= fitScale * LABEL_ZOOM_FACTOR);
+  }, [scale, fitScale, isInteracting]);
 
   const writeView = useCallback(() => {
     const el = viewRef.current;
@@ -101,8 +122,8 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     if (!el) return { tx: newTx, ty: newTy };
     const w = el.clientWidth;
     const h = el.clientHeight;
-    const scaledW = IMAGE_WIDTH * s;
-    const scaledH = IMAGE_HEIGHT * s;
+    const scaledW = W * s;
+    const scaledH = H * s;
 
     let clampedTx = newTx;
     let clampedTy = newTy;
@@ -120,25 +141,26 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     }
 
     return { tx: clampedTx, ty: clampedTy };
-  }, []);
+  }, [W, H]);
 
   const fitToContainer = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
     const cw = el.clientWidth;
     const ch = el.clientHeight;
-    const scaleX = cw / IMAGE_WIDTH;
-    const scaleY = ch / IMAGE_HEIGHT;
+    const scaleX = cw / W;
+    const scaleY = ch / H;
     const s = Math.min(scaleX, scaleY) * 0.95;
-    const newTx = (cw - IMAGE_WIDTH * s) / 2;
-    const newTy = (ch - IMAGE_HEIGHT * s) / 2;
+    const newTx = (cw - W * s) / 2;
+    const newTy = (ch - H * s) / 2;
     if (s < 0.0001) return;
     fitScaleRef.current = s;
+    setFitScale(s);
     smoothState.current = { scale: s, tx: newTx, ty: newTy };
     setScale(s);
     setTx(newTx);
     setTy(newTy);
-  }, []);
+  }, [W, H]);
 
   useEffect(() => {
     fitToContainer();
@@ -160,6 +182,17 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [fitToContainer, clampTransform]);
+
+  // Switching maps changes the canvas aspect and coordinate space, so the old
+  // transform, selection and search are meaningless on the new map.
+  useEffect(() => {
+    setSelected(null);
+    setHovered(null);
+    setTooltip(null);
+    setMobileDetail(null);
+    setSearch("");
+    fitToContainer();
+  }, [mapDef.id, fitToContainer]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -478,34 +511,49 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
             style={{
               transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
               transformOrigin: "0 0",
-              width: IMAGE_WIDTH,
-              height: IMAGE_HEIGHT,
+              width: W,
+              height: H,
               position: "relative",
               ...smoothStyle,
             }}
           >
-            <picture>
-              <source media="(max-width: 1023px)" type="image/webp" srcSet="/JALI_2400.webp" />
-              <source media="(max-width: 1023px)" type="image/jpeg" srcSet="/JALI_2400_base.jpg" />
-              <source type="image/avif" srcSet="/JALI_3600.avif" />
-              <source type="image/webp" srcSet="/JALI_3600.webp" />
-              <source type="image/jpeg" srcSet="/JALI_3600_base.jpg" />
+            {/* JALI ships pre-generated responsive derivatives; other maps
+                serve their single source image at the same aspect ratio. */}
+            {mapDef.slug === "jali" ? (
+              <picture>
+                <source media="(max-width: 1023px)" type="image/webp" srcSet="/JALI_2400.webp" />
+                <source media="(max-width: 1023px)" type="image/jpeg" srcSet="/JALI_2400_base.jpg" />
+                <source type="image/avif" srcSet="/JALI_3600.avif" />
+                <source type="image/webp" srcSet="/JALI_3600.webp" />
+                <source type="image/jpeg" srcSet="/JALI_3600_base.jpg" />
+                <img
+                  src={mapDef.image_url}
+                  alt={`${mapDef.name} layout plan`}
+                  width={W}
+                  height={H}
+                  className="absolute inset-0 w-full h-full select-none pointer-events-none"
+                  draggable={false}
+                  loading="eager"
+                  fetchPriority="high"
+                />
+              </picture>
+            ) : (
               <img
-                src="/JALI_3600_base.jpg"
-                alt="JALI Layout Plan"
-                width={IMAGE_WIDTH}
-                height={IMAGE_HEIGHT}
-                className="absolute inset-0 select-none pointer-events-none"
+                src={mapDef.image_url}
+                alt={`${mapDef.name} layout plan`}
+                width={W}
+                height={H}
+                className="absolute inset-0 w-full h-full select-none pointer-events-none"
                 draggable={false}
                 loading="eager"
                 fetchPriority="high"
               />
-            </picture>
+            )}
 
             <svg
-              width={IMAGE_WIDTH}
-              height={IMAGE_HEIGHT}
-              viewBox={`0 0 ${IMAGE_WIDTH} ${IMAGE_HEIGHT}`}
+              width={W}
+              height={H}
+              viewBox={`0 0 ${W} ${H}`}
               className="absolute inset-0"
             >
               {plots.map((plot) => {
@@ -552,7 +600,7 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
                       fill={color}
                       fillOpacity={isSelected ? 0.5 : isHovered ? 0.45 : 0.3}
                       stroke={color}
-                      strokeWidth={isSelected ? 16 : 10}
+                      strokeWidth={(isSelected ? 16 : 10) * vs}
                       strokeOpacity={isSelected ? 1 : 0.8}
                       strokeLinejoin="round"
                       style={isSelected ? { filter: `drop-shadow(0 0 10px ${color}80)` } : undefined}
@@ -560,15 +608,15 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
                     {showLabels && (
                       <text
                         x={plot.cx}
-                        y={plot.cy + 5}
+                        y={plot.cy + 5 * vs}
                         textAnchor="middle"
                         dominantBaseline="central"
-                        fontSize={calcFontSize(plot.polygon, plot.label)}
+                        fontSize={calcFontSize(plot.polygon, plot.label, W)}
                         fontWeight={700}
                         fill="#fff"
                         paintOrder="stroke"
                         stroke="rgba(0,0,0,0.6)"
-                        strokeWidth={3}
+                        strokeWidth={3 * vs}
                         strokeLinejoin="round"
                         style={{ pointerEvents: "none", userSelect: "none" }}
                       >
@@ -583,7 +631,7 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
 
           {/* Title chip - mobile */}
           <div className="sm:hidden absolute top-2 left-2 z-10 glass rounded-lg px-3 py-1.5 text-[11px] font-semibold pointer-events-none">
-            JALI Layout · {plots.length} plots
+            {mapDef.name} · {plots.length} plots
           </div>
 
           {/* Legend toggle - mobile */}
@@ -675,6 +723,43 @@ export default function PlotMap({ plots, initialSelected, onSelect }: Props) {
                 </div>
 
                 <div className="px-4 pb-3">
+                  {hasStatementMetadata(mobileDetail) && (
+                    <div className="mb-2 grid grid-cols-2 gap-2">
+                      <div className="col-span-2 rounded-lg px-3 py-2" style={{ background: "var(--accent-glow)" }}>
+                        <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Plot Area Statement</div>
+                        <div className="flex items-baseline gap-2 mt-0.5">
+                          <span className="text-sm font-extrabold">{displayPlotNumber(mobileDetail)}</span>
+                          {mobileDetail.plot_type && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent)]/20 text-[var(--accent)]">
+                              {mobileDetail.plot_type}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {formatDimension(mobileDetail.length, mobileDetail.length_is_avg) && (
+                        <div className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.04)" }}>
+                          <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Length</div>
+                          <div className="text-xs font-semibold mt-0.5">
+                            {formatDimension(mobileDetail.length, mobileDetail.length_is_avg)}
+                          </div>
+                        </div>
+                      )}
+                      {formatDimension(mobileDetail.width, mobileDetail.width_is_avg) && (
+                        <div className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.04)" }}>
+                          <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Width</div>
+                          <div className="text-xs font-semibold mt-0.5">
+                            {formatDimension(mobileDetail.width, mobileDetail.width_is_avg)}
+                          </div>
+                        </div>
+                      )}
+                      {mobileDetail.area_sq_ft != null && (
+                        <div className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.04)" }}>
+                          <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Area</div>
+                          <div className="text-xs font-semibold mt-0.5">{mobileDetail.area_sq_ft} sq.ft.</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     {mobileDetail.khasara && (
                       <div className="rounded-lg px-3 py-2" style={{ background: "rgba(255,255,255,0.04)" }}>

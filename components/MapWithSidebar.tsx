@@ -1,15 +1,28 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import PlotMap from "./PlotMap";
-import { PlotRow, STATUS_COLORS, STATUS_LABELS, PlotStatus } from "@/lib/types";
+import {
+  MapDef,
+  PlotRow,
+  STATUS_COLORS,
+  STATUS_LABELS,
+  PlotStatus,
+  displayPlotNumber,
+  formatDimension,
+  hasStatementMetadata,
+} from "@/lib/types";
 
 interface Props {
   plots: PlotRow[];
+  maps: MapDef[];
+  activeMap?: MapDef;
 }
 
-export default function MapWithSidebar({ plots }: Props) {
+export default function MapWithSidebar({ plots, maps, activeMap }: Props) {
   const [selectedPlot, setSelectedPlot] = useState<PlotRow | null>(null);
+  const router = useRouter();
 
   const total = plots.length;
   const stats = (Object.keys(STATUS_COLORS) as PlotStatus[]).reduce((acc, key) => {
@@ -17,11 +30,21 @@ export default function MapWithSidebar({ plots }: Props) {
     return acc;
   }, {} as Record<string, number>);
 
+  // Statement-backed area, summed only over plots the statement actually covers.
+  const statementArea = plots.reduce((sum, p) => sum + (p.area_sq_ft ?? 0), 0);
+  const statementCount = plots.filter(hasStatementMetadata).length;
+
   return (
     <div className="flex-1 flex min-h-0">
       {/* Left: Map */}
       <section id="map" className="flex-1 min-w-0 flex flex-col border-r border-[var(--border)]">
-        <PlotMap plots={plots} onSelect={setSelectedPlot} />
+        {activeMap ? (
+          <PlotMap plots={plots} mapDef={activeMap} onSelect={setSelectedPlot} />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">
+            No map configured yet.
+          </div>
+        )}
       </section>
 
       {/* Right: Sidebar */}
@@ -33,11 +56,46 @@ export default function MapWithSidebar({ plots }: Props) {
             <span className="text-[var(--accent)] text-[10px] font-medium">Live Data</span>
           </div>
           <h1 className="text-lg font-extrabold tracking-tight">
-            JALI <span style={{ background: "var(--gradient-1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Layout</span>
+            {activeMap?.name ?? "Layout"}{" "}
+            <span style={{ background: "var(--gradient-1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Layout
+            </span>
           </h1>
           <p className="text-[var(--text-muted)] text-xs mt-1">
             Zoom, pan aur click karke plots explore karo
           </p>
+
+          {/* Map switcher */}
+          {maps.length > 1 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {maps.map((m) => {
+                const active = m.id === activeMap?.id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => router.push(m.is_default ? "/" : `/?map=${m.slug}`)}
+                    aria-current={active ? "page" : undefined}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all"
+                    style={
+                      active
+                        ? {
+                            background: "var(--accent-glow)",
+                            color: "var(--accent)",
+                            borderColor: "rgba(0,212,170,0.35)",
+                          }
+                        : {
+                            background: "var(--bg-card)",
+                            color: "var(--text-muted)",
+                            borderColor: "var(--border)",
+                          }
+                    }
+                  >
+                    {m.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Selected Plot Detail */}
@@ -58,14 +116,56 @@ export default function MapWithSidebar({ plots }: Props) {
             <div className="glass rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">Plot Number</div>
-                  <div className="text-xl font-extrabold">{selectedPlot.label}</div>
+                  <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">
+                    {selectedPlot.plot_number != null ? "Plot Number" : "Label"}
+                  </div>
+                  <div className="text-xl font-extrabold">{displayPlotNumber(selectedPlot)}</div>
+                  {selectedPlot.plot_number != null && selectedPlot.plot_number !== Number(selectedPlot.label) && (
+                    <div className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">
+                      label {selectedPlot.label}
+                    </div>
+                  )}
                 </div>
                 <span className="status-badge text-xs px-2 py-1" style={{ background: STATUS_COLORS[selectedPlot.status] + "20", color: STATUS_COLORS[selectedPlot.status] }}>
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLORS[selectedPlot.status], boxShadow: `0 0 6px ${STATUS_COLORS[selectedPlot.status]}60` }} />
                   {STATUS_LABELS[selectedPlot.status]}
                 </span>
               </div>
+
+              {hasStatementMetadata(selectedPlot) && (
+                <div className="mb-3 pb-3 border-b border-[var(--border)]">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-[9px] font-semibold text-[var(--accent)] uppercase tracking-wider">
+                      Plot Area Statement
+                    </span>
+                    {selectedPlot.plot_type && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-glow)] text-[var(--accent)]">
+                        {selectedPlot.plot_type}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="text-[var(--text-muted)]">Length</span>
+                      <span className="font-medium">
+                        {formatDimension(selectedPlot.length, selectedPlot.length_is_avg) ?? "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="text-[var(--text-muted)]">Width</span>
+                      <span className="font-medium">
+                        {formatDimension(selectedPlot.width, selectedPlot.width_is_avg) ?? "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="text-[var(--text-muted)]">Area</span>
+                      <span className="font-semibold" style={{ color: "var(--accent)" }}>
+                        {selectedPlot.area_sq_ft != null ? `${selectedPlot.area_sq_ft} sq.ft.` : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2 text-xs">
                 {[
@@ -81,7 +181,7 @@ export default function MapWithSidebar({ plots }: Props) {
                     <span className="text-[var(--text-primary)] font-medium text-right">{item.value}</span>
                   </div>
                 ))}
-                {!selectedPlot.khasara && !selectedPlot.owner_name && !selectedPlot.size && (
+                {!selectedPlot.khasara && !selectedPlot.owner_name && !selectedPlot.size && !hasStatementMetadata(selectedPlot) && (
                   <div className="text-[var(--text-muted)] text-center py-2">No details added yet</div>
                 )}
               </div>
@@ -111,6 +211,20 @@ export default function MapWithSidebar({ plots }: Props) {
               </div>
             ))}
           </div>
+          {statementCount > 0 && (
+            <div className="mt-2 glass rounded-lg p-2.5 flex items-baseline justify-between">
+              <span className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider">
+                Statement Area
+              </span>
+              <span className="text-sm font-bold" style={{ color: "var(--accent)" }}>
+                {statementArea.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                <span className="text-[9px] font-normal text-[var(--text-muted)]">sq.ft.</span>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Legend */}

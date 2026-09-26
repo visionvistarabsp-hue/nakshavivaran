@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { authorizeAdmin } from "@/lib/admin";
 
 export async function GET() {
   return NextResponse.json({
@@ -12,17 +13,48 @@ export async function GET() {
 }
 
 export async function POST() {
+  // This endpoint writes plots, so it is admin-only. RLS would reject the
+  // inserts anyway; failing early keeps the response a clear 401 instead of a
+  // mid-batch RLS error after partial work.
+  const admin = await authorizeAdmin();
+  if (!admin) {
+    return NextResponse.json(
+      { error: "Unauthorized: admin sign-in required to seed" },
+      { status: 401 }
+    );
+  }
+
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // Check if plots already exist
+  // This endpoint seeds JALI only, from project/jali/data.json. Map 2 is seeded
+  // separately by scripts/seed-map2.mjs from data/map2_qa.json.
+  const { data: jaliMap } = await supabase
+    .from("maps")
+    .select("id, slug")
+    .eq("slug", "jali")
+    .maybeSingle();
+
+  if (!jaliMap) {
+    return NextResponse.json(
+      { error: 'Map "jali" not found - run the schema migration first' },
+      { status: 409 }
+    );
+  }
+
+  // Scoped to JALI on purpose: a global count would also block JALI reseeding
+  // once Map 2 rows exist, and the JALI sources disagree with the database
+  // (179 rows here vs 172 in plots_cv.json and 176 in data/jali_cv.json), so this
+  // must never silently overwrite the authoritative 179 rows.
   const { count } = await supabase
     .from("plots")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .eq("map_id", jaliMap.id);
 
   if (count && count > 0) {
     return NextResponse.json({
-      message: `Database already has ${count} plots. Skipping seed.`,
+      message: `JALI already has ${count} plots. Skipping seed.`,
+      hint: "The JALI polygon sources disagree with the database; delete the JALI rows explicitly if you really intend to reseed.",
     });
   }
 
@@ -41,6 +73,7 @@ export async function POST() {
 
   // Map the JSON data to Supabase rows
   const plots = data.plots.map((p: any) => ({
+    map_id: jaliMap.id,
     label: p.label,
     x: p.x,
     y: p.y,
@@ -74,6 +107,6 @@ export async function POST() {
   }
 
   return NextResponse.json({
-    message: `Successfully seeded ${inserted} plots into the database.`,
+    message: `Successfully seeded ${inserted} JALI plots into the database.`,
   });
 }

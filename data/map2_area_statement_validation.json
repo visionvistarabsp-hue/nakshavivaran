@@ -1,0 +1,60 @@
+{
+  "generated_from": "data/map2_qa.json",
+  "scope": "map_2 - 69 official plot records, geometry unmodified",
+  "record_counts": {
+    "expected": {
+      "plot": 59,
+      "lig": 4,
+      "ews": 6,
+      "total": 69
+    },
+    "actual": {
+      "plot": 59,
+      "lig": 4,
+      "ews": 6,
+      "total": 69
+    },
+    "pass": true
+  },
+  "area_reconciliation": {
+    "official_stated_total": 85748.82,
+    "calculated_total_all_69": 85748.62,
+    "variance": -0.2,
+    "treatment": "both preserved; no plot adjusted to absorb residual",
+    "subtotals": {
+      "plot": 79949.59,
+      "lig": 3245.72,
+      "ews": 2553.31
+    },
+    "numeric_59_only_sum": 79949.59,
+    "numeric_59_only_reconciles": false
+  },
+  "geometry_integrity": {
+    "polygon_sha256": "27d21eaecf00276afca332cc5e2231c705061cb23fa4da4c7e18ea39268806ac",
+    "plots": 69,
+    "ignored_regions": 7
+  },
+  "length_vs_width_consistency": {
+    "rows_compared": 69,
+    "rows_with_rounding_delta": 47,
+    "within_1_sqft": 18,
+    "significant_outliers_over_35_sqft": [
+      {
+        "label": "57",
+        "length": 74.82,
+        "width": 24.5,
+        "product": 1833.09,
+        "area_sq_ft": 1169.97,
+        "delta": 663.12
+      }
+    ],
+    "note": "Survey lengths/widths are rounded to 0.01 ft, so small L*W-vs-area deltas are expected and were never auto-corrected."
+  },
+  "data_quality_flags": [
+    {
+      "plot": "57",
+      "issue": "L*W = 1833.09 but area_sq_ft = 1169.97 (delta 663.12)",
+      "resolution": "Official area 1169.97 retained; it is the value consistent with the official total. Length 74.82 flagged as the likely transcription error (implied length at w=24.5 is 47.754 ft). No value changed."
+    }
+  ]
+}

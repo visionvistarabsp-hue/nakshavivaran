@@ -4,10 +4,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-export default function Header() {
+interface NavItem {
+  href: string;
+  label: string;
+  /** Map routes share the "/" pathname, so they're matched on the active map instead. */
+  slug?: string;
+}
+
+export default function Header({ activeMapSlug }: { activeMapSlug?: string } = {}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const isAdmin = pathname === "/admin";
+  const nav: NavItem[] = [
+    { href: "/", label: "JALI Map", slug: "jali" },
+    { href: "/?map=map-2", label: "Map 2", slug: "map-2" },
+    { href: "/admin", label: "Admin Panel" },
+  ];
+
+  const isActive = (n: NavItem) =>
+    n.slug ? pathname === "/" && activeMapSlug === n.slug : pathname === n.href;
 
   return (
     <header className="sticky top-0 z-50 glass">
@@ -30,26 +44,19 @@ export default function Header() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
-          <Link
-            href="/"
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              !isAdmin
-                ? "bg-[var(--accent-glow)] text-[var(--accent)]"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]"
-            }`}
-          >
-            Map
-          </Link>
-          <Link
-            href="/admin"
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isAdmin
-                ? "bg-[var(--accent-glow)] text-[var(--accent)]"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]"
-            }`}
-          >
-            Admin Panel
-          </Link>
+          {nav.map((n) => (
+            <Link
+              key={n.href}
+              href={n.href}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive(n)
+                  ? "bg-[var(--accent-glow)] text-[var(--accent)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]"
+              }`}
+            >
+              {n.label}
+            </Link>
+          ))}
           <div className="w-px h-5 bg-[var(--border)] mx-2" />
           <a
             href="#contact"
@@ -77,12 +84,18 @@ export default function Header() {
       {/* Mobile nav */}
       {open && (
         <div className="md:hidden px-4 pb-4 border-t border-[var(--border)] animate-fade-in">
-          <Link href="/" className="block py-3 text-sm font-medium" onClick={() => setOpen(false)}>
-            Map
-          </Link>
-          <Link href="/admin" className="block py-3 text-sm font-medium" onClick={() => setOpen(false)}>
-            Admin Panel
-          </Link>
+          {nav.map((n) => (
+            <Link
+              key={n.href}
+              href={n.href}
+              className={`block py-3 text-sm font-medium ${
+                isActive(n) ? "text-[var(--accent)]" : ""
+              }`}
+              onClick={() => setOpen(false)}
+            >
+              {n.label}
+            </Link>
+          ))}
         </div>
       )}
     </header>

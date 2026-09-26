@@ -1,13 +1,84 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { PlotRow, PlotStatus, STATUS_COLORS, STATUS_LABELS } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
+import {
+  MapDef,
+  PlotRow,
+  PlotStatus,
+  STATUS_COLORS,
+  STATUS_LABELS,
+  displayPlotNumber,
+  formatDimension,
+  hasStatementMetadata,
+} from "@/lib/types";
 
 interface Props {
   plots: PlotRow[];
+  maps: MapDef[];
+  activeMap?: MapDef;
+  adminEmail: string;
 }
 
-export default function AdminPanel({ plots: initialPlots }: Props) {
+/**
+ * Plot Area Statement values are transcribed from the official statement and are
+ * deliberately read-only here: they must not drift away from the source document,
+ * and the admin form is not the place to retype them.
+ */
+function StatementBlock({ plot, compact }: { plot: PlotRow; compact?: boolean }) {
+  if (!hasStatementMetadata(plot)) return null;
+
+  const rows: [string, string][] = [
+    ["Plot no.", displayPlotNumber(plot)],
+    ["Type", plot.plot_type || "-"],
+    ["Length", formatDimension(plot.length, plot.length_is_avg) ?? "-"],
+    ["Width", formatDimension(plot.width, plot.width_is_avg) ?? "-"],
+    [
+      "Area",
+      plot.area_sq_ft != null
+        ? `${plot.area_sq_ft.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })} sq.ft.`
+        : "-",
+    ],
+  ];
+
+  return (
+    <div className="shrink-0 rounded-xl border border-[rgba(0,212,170,0.18)] bg-[var(--accent-glow)] p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+        <span className="text-[9px] font-semibold text-[var(--accent)] uppercase tracking-wider">
+          Plot Area Statement
+        </span>
+        <span className="ml-auto text-[8px] text-[var(--text-muted)] uppercase tracking-wider">
+          read only
+        </span>
+      </div>
+      <div className={compact ? "grid grid-cols-2 gap-x-3 gap-y-1" : "space-y-1"}>
+        {rows.map(([k, v]) => (
+          <div key={k} className={compact ? "flex items-baseline justify-between gap-2" : "flex items-baseline justify-between gap-3"}>
+            <span className="text-[10px] text-[var(--text-muted)]">{k}</span>
+            <span className="text-xs font-semibold text-[var(--text-primary)] tabular-nums text-right">
+              {v}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function AdminPanel({
+  plots: initialPlots,
+  maps,
+  activeMap,
+  adminEmail,
+}: Props) {
   const [plots, setPlots] = useState<PlotRow[]>(initialPlots);
   const [selected, setSelected] = useState<PlotRow | null>(null);
   const [search, setSearch] = useState("");
@@ -27,12 +98,16 @@ export default function AdminPanel({ plots: initialPlots }: Props) {
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaved = useRef<string>("");
+  const router = useRouter();
 
   const filtered = plots.filter((p) => {
-    const matchSearch = !search ||
-      p.label.toLowerCase().includes(search.toLowerCase()) ||
-      p.khasara.toLowerCase().includes(search.toLowerCase()) ||
-      p.owner_name.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = !q ||
+      p.label.toLowerCase().includes(q) ||
+      p.khasara.toLowerCase().includes(q) ||
+      p.owner_name.toLowerCase().includes(q) ||
+      (p.plot_number != null && String(p.plot_number).includes(q)) ||
+      (p.area_sq_ft != null && String(p.area_sq_ft).includes(q));
     const matchStatus = filterStatus === "all" || p.status === filterStatus;
     return matchSearch && matchStatus;
   });
@@ -117,6 +192,13 @@ export default function AdminPanel({ plots: initialPlots }: Props) {
     agreement_signed: plots.filter((p) => p.status === "agreement_signed").length,
   };
 
+  const handleSignOut = useCallback(async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    // The admin page is server-guarded, so a full refresh drops us on /login.
+    window.location.href = "/login";
+  }, []);
+
   return (
     <div className="flex flex-col h-full">
       {/* Mobile: Back button when editing */}
@@ -137,12 +219,29 @@ export default function AdminPanel({ plots: initialPlots }: Props) {
       {/* Header */}
       <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4">
         <div className="max-w-7xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent-glow)] border border-[rgba(0,212,170,0.2)] mb-3">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
-              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-            </svg>
-            <span className="text-[var(--accent)] text-xs font-medium">Admin Panel</span>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent-glow)] border border-[rgba(0,212,170,0.2)]">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
+                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a1.65 1.65 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a1.65 1.65 0 0 1-3 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a1.65 1.65 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a1.65 1.65 0 0 1 0-3h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a1.65 1.65 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a1.65 1.65 0 0 1 3 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a1.65 1.65 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a1.65 1.65 0 0 1 0 3h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+              <span className="text-[var(--accent)] text-xs font-medium">Admin Panel</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span
+                className="hidden sm:inline text-[var(--text-muted)] text-xs truncate max-w-[180px]"
+                title={adminEmail}
+              >
+                {adminEmail}
+              </span>
+              <button
+                onClick={handleSignOut}
+                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline shrink-0"
+              >
+                Sign out
+              </button>
+            </div>
           </div>
           <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight mb-2">
             Plot <span style={{ background: "var(--gradient-1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Management</span>
@@ -150,6 +249,42 @@ export default function AdminPanel({ plots: initialPlots }: Props) {
           <p className="text-[var(--text-secondary)] text-xs sm:text-sm mb-4">
             Khasra, owner, size aur status manage karo — auto-save
           </p>
+
+          {/* Map scope - plot labels are only unique within a map */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-4">
+            {maps.map((m) => {
+              const active = m.id === activeMap?.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => router.push(m.is_default ? "/admin" : `/admin?map=${m.slug}`)}
+                  aria-current={active ? "page" : undefined}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all"
+                  style={
+                    active
+                      ? {
+                          background: "var(--accent-glow)",
+                          color: "var(--accent)",
+                          borderColor: "rgba(0,212,170,0.35)",
+                        }
+                      : {
+                          background: "var(--bg-card)",
+                          color: "var(--text-muted)",
+                          borderColor: "var(--border)",
+                        }
+                  }
+                >
+                  {m.name}
+                </button>
+              );
+            })}
+            {activeMap && (
+              <span className="text-[10px] text-[var(--text-muted)] ml-1">
+                {stats.total} plots · labels scoped to this map
+              </span>
+            )}
+          </div>
+
 
           {/* Stats - horizontal scroll on mobile */}
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-6 sm:gap-2">
@@ -282,6 +417,8 @@ export default function AdminPanel({ plots: initialPlots }: Props) {
                   <textarea value={formData.notes} onChange={(e) => updateForm({ notes: e.target.value })} rows={2} placeholder="Notes..."
                     className="w-full px-3 py-2 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none" />
                 </div>
+
+                <StatementBlock plot={selected} compact />
               </div>
             </div>
           ) : (
@@ -488,6 +625,8 @@ export default function AdminPanel({ plots: initialPlots }: Props) {
                   <textarea value={formData.notes} onChange={(e) => updateForm({ notes: e.target.value })} rows={3} placeholder="Any additional notes..."
                     className="w-full px-4 py-2.5 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none" />
                 </div>
+
+                <StatementBlock plot={selected} />
               </div>
             </div>
           ) : (

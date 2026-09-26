@@ -30,3 +30,15 @@ next-env.d.ts
 
 # netlify
 .netlify
+
+# QA / diagnostic screenshots. These are review artifacts, not app assets: files
+# under public/ are served verbatim, so committing them would ship ~1.8MB of
+# debug screenshots to production.
+public/qa_*.png
+marked_map_*.png
+*_3x.png
+diagnostic_*.png
+zoom_*.png
+
+# local backups of generated data
+*.bak
