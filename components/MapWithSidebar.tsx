@@ -18,9 +18,16 @@ interface Props {
   plots: PlotRow[];
   maps: MapDef[];
   activeMap?: MapDef;
+  /** A share view passes false to drop the switcher and the admin editor link. */
+  showMapSwitcher?: boolean;
 }
 
-export default function MapWithSidebar({ plots, maps, activeMap }: Props) {
+export default function MapWithSidebar({
+  plots,
+  maps,
+  activeMap,
+  showMapSwitcher = true,
+}: Props) {
   const [selectedPlot, setSelectedPlot] = useState<PlotRow | null>(null);
   const router = useRouter();
 
@@ -66,7 +73,7 @@ export default function MapWithSidebar({ plots, maps, activeMap }: Props) {
           </p>
 
           {/* Map switcher */}
-          {maps.length > 1 && (
+          {showMapSwitcher && maps.length > 1 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {maps.map((m) => {
                 const active = m.id === activeMap?.id;
@@ -186,10 +193,12 @@ export default function MapWithSidebar({ plots, maps, activeMap }: Props) {
                 )}
               </div>
 
-              <a href="/admin" className="block mt-3 text-center text-[10px] font-semibold py-2 rounded-lg transition-all"
-                style={{ background: "var(--accent-glow)", color: "var(--accent)" }}>
-                Edit in Admin →
-              </a>
+              {showMapSwitcher && (
+                <a href="/admin" className="block mt-3 text-center text-[10px] font-semibold py-2 rounded-lg transition-all"
+                  style={{ background: "var(--accent-glow)", color: "var(--accent)" }}>
+                  Edit in Admin →
+                </a>
+              )}
             </div>
           </div>
         )}
