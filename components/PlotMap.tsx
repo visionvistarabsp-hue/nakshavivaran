@@ -732,6 +732,16 @@ export default function PlotMap({
                 </div>
 
                 <div className="px-4 pb-3">
+                  {mobileDetail.photo_url && (
+                    <div className="mb-2 rounded-xl overflow-hidden border border-[var(--border)]">
+                      <img
+                        src={mobileDetail.photo_url}
+                        alt={`Plot ${displayPlotNumber(mobileDetail)} photo`}
+                        className="w-full h-40 object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
                   {hasStatementMetadata(mobileDetail) && (
                     <div className="mb-2 grid grid-cols-2 gap-2">
                       <div className="col-span-2 rounded-lg px-3 py-2" style={{ background: "var(--accent-glow)" }}>
