@@ -6,15 +6,18 @@
     "node": ">=20 <21"
   },
   "scripts": {
-    "dev": "rimraf .next && next dev",
-    "build": "rimraf .next && next build",
+    "clean:next": "node -e \"require('node:fs').rmSync('.next',{recursive:true,force:true,maxRetries:40,retryDelay:250})\"",
+    "dev": "npm run clean:next && next dev",
+    "build": "npm run clean:next && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "clean": "rimraf .next node_modules"
+    "clean": "npm run clean:next && rimraf node_modules"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.580.0",
+    "@aws-sdk/s3-request-presigner": "^3.580.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.43.4",
     "next": "14.2.5",

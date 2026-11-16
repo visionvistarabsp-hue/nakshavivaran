@@ -20,6 +20,10 @@ export function makeMap(over: Partial<MapDef> = {}): MapDef {
 
 /** A complete PlotRow, defaulting to a plain available plot with no statement. */
 export function makePlot(over: Partial<PlotRow> = {}): PlotRow {
+  const filtered: Partial<PlotRow> = {};
+  for (const [k, v] of Object.entries(over)) {
+    if (v !== undefined) (filtered as Record<string, unknown>)[k] = v;
+  }
   return {
     id: "p1",
     map_id: "1",
@@ -50,8 +54,10 @@ export function makePlot(over: Partial<PlotRow> = {}): PlotRow {
     area_sq_ft: null,
     length_is_avg: false,
     width_is_avg: false,
+    photo_url: null,
+    document_url: null,
     created_at: TS,
     updated_at: TS,
-    ...over,
+    ...filtered,
   };
 }

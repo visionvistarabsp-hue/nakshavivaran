@@ -22,7 +22,15 @@ export default function ShareLinkButton({
   resetAfterMs = 2000,
 }: Props) {
   const [state, setState] = useState<State>("idle");
+  const [mounted, setMounted] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -36,8 +44,6 @@ export default function ShareLinkButton({
       await navigator.clipboard.writeText(`${window.location.origin}/m/${slug}`);
       setState("copied");
     } catch {
-      // Clipboard writes fail outside a secure context or when permission is
-      // denied, so say so rather than pretending the link was copied.
       setState("failed");
     }
     if (timer.current) clearTimeout(timer.current);
@@ -45,14 +51,15 @@ export default function ShareLinkButton({
   }
 
   const label = state === "copied" ? "Copied" : state === "failed" ? "Failed · Try again" : "Share";
-  const link = typeof window === "undefined" ? `/m/${slug}` : `${window.location.origin}/m/${slug}`;
+  // Use relative path for title to avoid server/client mismatch
+  const title = `/m/${slug}`;
 
   return (
     <button
       type="button"
       onClick={copyLink}
       aria-label={`Copy share link for ${mapName}`}
-      title={link}
+      title={title}
       className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border transition-all"
       style={{
         background: state === "copied" ? "var(--accent-glow)" : "var(--bg-card)",

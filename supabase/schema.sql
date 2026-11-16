@@ -57,6 +57,12 @@ CREATE TABLE IF NOT EXISTS plots (
   road TEXT DEFAULT '',
   notes TEXT DEFAULT '',
 
+  -- Cloudflare R2 photo URL (optional, shown on public map)
+  photo_url TEXT,
+
+  -- Cloudflare R2 document URL (optional, admin-only, NOT shown on public map)
+  document_url TEXT,
+
   -- Plot Area Statement metadata (source of truth, verbatim from the document)
   plot_number   INTEGER,
   plot_type     TEXT CHECK (plot_type IS NULL OR plot_type IN ('PLOT', 'LIG', 'EWS')),

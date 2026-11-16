@@ -144,6 +144,17 @@ export default function MapWithSidebar({
                 </span>
               </div>
 
+              {/* Photo display */}
+              {selectedPlot.photo_url && (
+                <div className="mb-3 rounded-xl overflow-hidden border border-[var(--border)]">
+                  <img
+                    src={selectedPlot.photo_url}
+                    alt="Plot photo"
+                    className="w-full h-48 object-cover"
+                  />
+                </div>
+              )}
+
               {hasStatementMetadata(selectedPlot) && (
                 <div className="mb-3 pb-3 border-b border-[var(--border)]">
                   <div className="flex items-center gap-1.5 mb-2">

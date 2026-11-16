@@ -18,6 +18,8 @@ const EDITABLE = new Set([
   "facing",
   "road",
   "notes",
+  "photo_url",
+  "document_url",
 ]);
 
 const IMMUTABLE = new Set([
@@ -88,6 +90,16 @@ export async function PATCH(
     .single();
 
   if (error) {
+    // If the column doesn't exist, return a clear message
+    if (error.message.includes("column") && error.message.includes("does not exist")) {
+      return NextResponse.json(
+        {
+          error: `Database column missing: ${error.message}. Run supabase/migrations/002_add_photo_columns.sql in Supabase SQL Editor.`,
+          hint: "Run: ALTER TABLE plots ADD COLUMN IF NOT EXISTS photo_url TEXT; ALTER TABLE plots ADD COLUMN IF NOT EXISTS document_url TEXT;",
+        },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 

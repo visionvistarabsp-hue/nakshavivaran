@@ -4,6 +4,8 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import ShareLinkButton from "./ShareLinkButton";
+import PhotoUpload from "./PhotoUpload";
+import DocumentUpload from "./DocumentUpload";
 import {
   MapDef,
   PlotRow,
@@ -95,6 +97,11 @@ export default function AdminPanel({
     facing: "",
     road: "",
     notes: "",
+    photo_url: selected?.photo_url || "",
+    document_url: selected?.document_url || "",
+    // Temporary upload state
+    uploadStatus: "idle" as "idle" | "uploading" | "success" | "error",
+    selectedFile: null as File | null,
   });
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,6 +135,10 @@ export default function AdminPanel({
       facing: plot.facing || "",
       road: plot.road || "",
       notes: plot.notes || "",
+      photo_url: plot.photo_url || "",
+      document_url: plot.document_url || "",
+      uploadStatus: "idle",
+      selectedFile: null,
     });
     lastSaved.current = JSON.stringify({
       khasara: plot.khasara || "",
@@ -138,24 +149,40 @@ export default function AdminPanel({
       facing: plot.facing || "",
       road: plot.road || "",
       notes: plot.notes || "",
+      photo_url: plot.photo_url || "",
+      document_url: plot.document_url || "",
     });
     setSaveStatus("idle");
     setMobileView("form");
   }, []);
 
   const saveToServer = useCallback(async (data: typeof formData, plot: PlotRow) => {
-    const serialized = JSON.stringify(data);
+    const { khasara, owner_name, size, status, agreement, facing, road, notes, photo_url, document_url } = data;
+    const serialized = JSON.stringify({ khasara, owner_name, size, status, agreement, facing, road, notes, photo_url, document_url });
     if (serialized === lastSaved.current) return;
 
     pendingSave.current = null;
     setSaveStatus("saving");
     try {
+      const payload: Record<string, unknown> = { khasara, owner_name, size, status, agreement, facing, road, notes };
+
+      // Only include photo_url/document_url if they were explicitly changed
+      if (photo_url !== (plot.photo_url || "")) {
+        payload.photo_url = photo_url || null;
+      }
+      if (document_url !== (plot.document_url || "")) {
+        payload.document_url = document_url || null;
+      }
+
       const res = await fetch(`/api/plots/${plot.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to save");
+      }
       const { plot: updated } = await res.json();
       setPlots((prev) =>
         prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
@@ -164,7 +191,7 @@ export default function AdminPanel({
       lastSaved.current = serialized;
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch {
+    } catch (err) {
       setSaveStatus("error");
       setTimeout(() => setSaveStatus("idle"), 3000);
     }
@@ -438,6 +465,26 @@ export default function AdminPanel({
                     className="w-full px-3 py-2 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none" />
                 </div>
 
+                <div>
+                  <label className="block text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Plot Photo</label>
+                  <PhotoUpload
+                    plotId={selected.id}
+                    currentPhotoUrl={formData.photo_url || null}
+                    onUploadComplete={(url) => updateForm({ photo_url: url })}
+                    onDelete={() => updateForm({ photo_url: "" })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">Document (PDF/DOC)</label>
+                  <DocumentUpload
+                    plotId={selected.id}
+                    currentDocumentUrl={formData.document_url || null}
+                    onUploadComplete={(url) => updateForm({ document_url: url })}
+                    onDelete={() => updateForm({ document_url: "" })}
+                  />
+                </div>
+
                 <StatementBlock plot={selected} compact />
               </div>
             </div>
@@ -644,6 +691,26 @@ export default function AdminPanel({
                   <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Notes</label>
                   <textarea value={formData.notes} onChange={(e) => updateForm({ notes: e.target.value })} rows={3} placeholder="Any additional notes..."
                     className="w-full px-4 py-2.5 text-sm bg-[var(--bg-card)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Plot Photo</label>
+                  <PhotoUpload
+                    plotId={selected.id}
+                    currentPhotoUrl={formData.photo_url || null}
+                    onUploadComplete={(url) => updateForm({ photo_url: url })}
+                    onDelete={() => updateForm({ photo_url: "" })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">Document (PDF/DOC)</label>
+                  <DocumentUpload
+                    plotId={selected.id}
+                    currentDocumentUrl={formData.document_url || null}
+                    onUploadComplete={(url) => updateForm({ document_url: url })}
+                    onDelete={() => updateForm({ document_url: "" })}
+                  />
                 </div>
 
                 <StatementBlock plot={selected} />

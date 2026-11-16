@@ -104,6 +104,7 @@ const INSERTABLE = [
   "facing",
   "road",
   "notes",
+  "photo_url",
 ] as const;
 
 /**

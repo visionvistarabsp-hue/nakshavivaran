@@ -45,6 +45,12 @@ export interface PlotRow {
   length_is_avg: boolean;
   width_is_avg: boolean;
 
+  // Cloudflare R2 photo URL (optional, shown on public map)
+  photo_url: string | null;
+
+  // Cloudflare R2 document URL (optional, admin-only, NOT shown on public map)
+  document_url: string | null;
+
   created_at: string;
   updated_at: string;
 }
