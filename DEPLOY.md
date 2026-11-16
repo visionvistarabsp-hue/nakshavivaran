@@ -2,7 +2,7 @@
 
 ## Runtime
 
-- Node 20 (`.nvmrc`, and `engines.node` in `package.json`).
+- Node 22+ (`.nvmrc`, and `engines.node` in `package.json`).
 - `npm run build` is `rimraf .next && next build`. The `rimraf` matters: building
   over a stale `.next` on a OneDrive-synced folder fails with
   `EINVAL ... functions-config-manifest.json`.
